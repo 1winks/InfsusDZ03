@@ -1,13 +1,12 @@
 package infsus.pinsus.controller;
 
+import infsus.pinsus.domain.Instructor;
 import infsus.pinsus.dto.InstructorDTO;
+import infsus.pinsus.dto.InstructorDTO2;
 import infsus.pinsus.service.InstructorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -22,5 +21,11 @@ public class InstructorController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public List<InstructorDTO> listInstructors(){
         return instructorService.listAllActive();
+    }
+
+    @PutMapping("/update")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public Instructor updateInstructor(@RequestBody InstructorDTO2 instructorDTO){
+        return instructorService.updateInstructor(instructorDTO);
     }
 }
