@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import EditProfile from "./EditProfile";
 import OstaviRecenziju from "./OstaviRecenziju";
+import LessonsPage from "./LessonsPage";
 
 export default function PregledInstruktora({ onLogout }) {
     const [instructors, setInstructors] = useState([]);
@@ -15,6 +16,8 @@ export default function PregledInstruktora({ onLogout }) {
     const [sortBy, setSortBy] = useState("subject");
     const [selectedSubject, setSelectedSubject] = useState("");
     const [showEditProfile, setShowEditProfile] = useState(false);
+    const [showLessons, setShowLessons] = useState(false);
+    const isAdmin = checkIsAdmin();
 
     useEffect(() => {
         fetchInstructorsAndProfiles();
@@ -28,6 +31,8 @@ export default function PregledInstruktora({ onLogout }) {
     const logout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("username");
+        localStorage.removeItem("roles");
+        localStorage.removeItem("role");
 
         if (onLogout) {
             onLogout();
@@ -126,6 +131,51 @@ export default function PregledInstruktora({ onLogout }) {
             alert("Backend nije dostupan.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const blockInstructor = async (instructor) => {
+        const username = getInstructorUsername(instructor);
+
+        const confirmed = window.confirm(
+            `Jesi li siguran da želiš blokirati instruktora ${username}?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch("http://localhost:8080/api/resources/instructors/update", {
+                method: "PUT",
+                headers: authHeaders(),
+                body: JSON.stringify({
+                    name: username,
+                    age: getInstructorAge(instructor) ? Number(getInstructorAge(instructor)) : null,
+                    phone: getInstructorPhone(instructor),
+                    active: false,
+                }),
+            });
+
+            if (response.status === 401 || response.status === 403) {
+                handleUnauthorized();
+                return;
+            }
+
+            if (response.ok) {
+                alert("Instruktor je uspješno blokiran.");
+                setSelectedInstructor(null);
+                setSelectedInstructorProfiles([]);
+                setSelectedInstructorReviews([]);
+                fetchInstructorsAndProfiles();
+            } else {
+                const error = await response.text();
+                console.error(error);
+                alert("Greška kod blokiranja instruktora.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Backend nije dostupan.");
         }
     };
 
@@ -281,6 +331,16 @@ export default function PregledInstruktora({ onLogout }) {
                 }}
                 onLogout={logout}
                 onReview={() => setReviewInstructor(selectedInstructor)}
+                onBlock={() => blockInstructor(selectedInstructor)}
+                isAdmin={isAdmin}
+            />
+        );
+    }
+    if (showLessons) {
+        return (
+            <LessonsPage
+                onBack={() => setShowLessons(false)}
+                onLogout={onLogout}
             />
         );
     }
@@ -290,6 +350,7 @@ export default function PregledInstruktora({ onLogout }) {
             <Navbar
                 onLogout={logout}
                 onEditProfile={() => setShowEditProfile(true)}
+                onOpenLessons={() => setShowLessons(true)}
             />
 
             <main style={styles.container}>
@@ -298,7 +359,7 @@ export default function PregledInstruktora({ onLogout }) {
                 <section style={styles.controls}>
                     <input
                         type="text"
-                        placeholder="Pretraži po instruktoru, predmetu, telefonu ili opisu"
+                        placeholder="Pretraži"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={styles.searchInput}
@@ -326,7 +387,6 @@ export default function PregledInstruktora({ onLogout }) {
                             onChange={(e) => setSortBy(e.target.value)}
                             style={styles.sortSelect}
                         >
-                            <option value="subject">Sortiraj po predmetu</option>
                             <option value="price-asc">Cijena: najniža prvo</option>
                             <option value="price-desc">Cijena: najviša prvo</option>
                             <option value="rating-desc">Ocjena: najviša prvo</option>
@@ -357,13 +417,20 @@ export default function PregledInstruktora({ onLogout }) {
     );
 }
 
-function Navbar({ onLogout, onEditProfile }) {
+function Navbar({ onLogout, onEditProfile, onOpenLessons }) {
     return (
         <nav style={styles.navbar}>
             <div style={styles.logoSection}>
                 <button style={styles.menuButton}>☰</button>
-                <h1 style={styles.logo}>EduConnect</h1>
+                <h1 style={styles.logo}>PINSUS</h1>
             </div>
+
+            <button
+                style={styles.profileButton}
+                onClick={onOpenLessons}
+            >
+                Lessons
+            </button>
 
             <div style={styles.navButtons}>
                 <button style={styles.profileButton} onClick={onEditProfile}>
@@ -407,9 +474,9 @@ function InstructionProfileCard({ instructor, profile, reviews, onOpenProfile })
             <p style={styles.description}>{description || "Nema opisa profila instrukcija."}</p>
 
             <div style={styles.infoSection}>
-                {email && <p>📧 {email}</p>}
+                {email && <p> {email}</p>}
                 {phone && <p>📞 {phone}</p>}
-                {age && <p>🎂 {age} godina</p>}
+                {age && <p> {age} godina</p>}
             </div>
 
             <button style={styles.profileViewButton} onClick={onOpenProfile}>
@@ -419,7 +486,7 @@ function InstructionProfileCard({ instructor, profile, reviews, onOpenProfile })
     );
 }
 
-function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onLogout, onReview }) {
+function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onLogout, onReview, onBlock, isAdmin }) {
     const username = getInstructorUsername(instructor);
     const email = getInstructorEmail(instructor);
     const phone = getInstructorPhone(instructor);
@@ -431,7 +498,7 @@ function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onL
             <nav style={styles.navbar}>
                 <div style={styles.logoSection}>
                     <button style={styles.menuButton}>☰</button>
-                    <h1 style={styles.logo}>EduConnect</h1>
+                    <h1 style={styles.logo}>PINSUS</h1>
                 </div>
 
                 <div style={styles.navButtons}>
@@ -454,9 +521,9 @@ function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onL
                         <p style={styles.profileSubject}>Podaci o instruktoru</p>
 
                         <div style={styles.profileMeta}>
-                            {email && <p>📧 {email}</p>}
+                            {email && <p> {email}</p>}
                             {phone && <p>📞 {phone}</p>}
-                            {age && <p>🎂 {age} godina</p>}
+                            {age && <p> {age} godina</p>}
                             <p>⭐ Prosječna ocjena: {averageScore}</p>
                         </div>
                     </div>
@@ -466,9 +533,17 @@ function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onL
                     <div style={styles.profileHeaderActions}>
                         <h3 style={styles.sectionTitle}>Profili instrukcija</h3>
 
-                        <button style={styles.reviewButton} onClick={onReview}>
-                            Ostavi recenziju
-                        </button>
+                        <div style={styles.actionButtons}>
+                            <button style={styles.reviewButton} onClick={onReview}>
+                                Ostavi recenziju
+                            </button>
+
+                            {isAdmin && localStorage.getItem("username") !== username && (
+                                <button style={styles.blockButton} onClick={onBlock}>
+                                    Blokiraj instruktora
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {loading ? (
@@ -533,6 +608,22 @@ function ReviewItem({ review }) {
             <p style={styles.reviewComment}>{getReviewComment(review)}</p>
         </div>
     );
+}
+
+function checkIsAdmin() {
+    const storedRoles = localStorage.getItem("roles") || localStorage.getItem("role") || "";
+
+    try {
+        const parsedRoles = JSON.parse(storedRoles);
+
+        if (Array.isArray(parsedRoles)) {
+            return parsedRoles.some((role) => String(role).toUpperCase().includes("ADMIN"));
+        }
+    } catch (error) {
+        // Ako nije JSON nego običan string, koristi se donja provjera.
+    }
+
+    return storedRoles.toUpperCase().includes("ADMIN");
 }
 
 function calculateAverageScore(reviews) {
@@ -881,8 +972,25 @@ const styles = {
         marginBottom: "18px",
     },
 
+    actionButtons: {
+        display: "flex",
+        gap: "12px",
+        flexWrap: "wrap",
+    },
+
     reviewButton: {
         backgroundColor: "#0f172a",
+        color: "white",
+        border: "none",
+        padding: "14px 20px",
+        borderRadius: "12px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        fontSize: "15px",
+    },
+
+    blockButton: {
+        backgroundColor: "#dc2626",
         color: "white",
         border: "none",
         padding: "14px 20px",

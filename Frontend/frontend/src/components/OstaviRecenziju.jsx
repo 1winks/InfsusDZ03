@@ -83,7 +83,7 @@ export default function OstaviRecenziju({ instructor, onBack, onLogout }) {
             <nav style={styles.navbar}>
                 <div style={styles.logoSection}>
                     <button type="button" style={styles.menuButton}>☰</button>
-                    <h1 style={styles.logo}>EduConnect</h1>
+                    <h1 style={styles.logo}>PINSUS</h1>
                 </div>
 
                 <div style={styles.navButtons}>
@@ -114,9 +114,9 @@ export default function OstaviRecenziju({ instructor, onBack, onLogout }) {
                         <h3 style={styles.instructorName}>{instructorName || "Instruktor"}</h3>
                         <p style={styles.instructorLabel}>Instruktor</p>
 
-                        {instructorEmail && <p style={styles.instructorInfo}>📧 {instructorEmail}</p>}
+                        {instructorEmail && <p style={styles.instructorInfo}> {instructorEmail}</p>}
                         {instructor?.phone && <p style={styles.instructorInfo}>📞 {instructor.phone}</p>}
-                        {instructor?.age && <p style={styles.instructorInfo}>🎂 {instructor.age} godina</p>}
+                        {instructor?.age && <p style={styles.instructorInfo}> {instructor.age} godina</p>}
                     </article>
 
                     <form style={styles.formCard} onSubmit={handleSubmit}>

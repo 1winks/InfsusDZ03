@@ -5,6 +5,7 @@ export default function EditProfile({ onBack, onLogout }) {
 
     const [subjects, setSubjects] = useState([]);
     const [profiles, setProfiles] = useState([]);
+    const [reviews, setReviews] = useState([]);
 
     const [instructorData, setInstructorData] = useState({
         name: username,
@@ -26,11 +27,13 @@ export default function EditProfile({ onBack, onLogout }) {
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [loadingSubjects, setLoadingSubjects] = useState(true);
     const [loadingExistingProfiles, setLoadingExistingProfiles] = useState(true);
+    const [loadingReviews, setLoadingReviews] = useState(true);
 
     useEffect(() => {
         fetchSubjects();
         fetchInstructorData();
         fetchInstructorProfiles();
+        fetchMyReviews();
     }, []);
 
     const getToken = () => localStorage.getItem("token");
@@ -143,6 +146,39 @@ export default function EditProfile({ onBack, onLogout }) {
             alert("Backend nije dostupan.");
         } finally {
             setLoadingExistingProfiles(false);
+        }
+    };
+
+    const fetchMyReviews = async () => {
+        try {
+            setLoadingReviews(true);
+
+            const response = await fetch(
+                `http://localhost:8080/api/resources/reviews/${username}`,
+                {
+                    method: "GET",
+                    headers: authHeaders(),
+                }
+            );
+
+            if (response.status === 401 || response.status === 403) {
+                handleUnauthorized();
+                return;
+            }
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setReviews(data);
+            } else {
+                console.error(data);
+                alert("Greška kod dohvaćanja recenzija.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Backend nije dostupan.");
+        } finally {
+            setLoadingReviews(false);
         }
     };
 
@@ -329,7 +365,7 @@ export default function EditProfile({ onBack, onLogout }) {
             <nav style={styles.navbar}>
                 <div style={styles.logoSection}>
                     <button type="button" style={styles.menuButton}>☰</button>
-                    <h1 style={styles.logo}>EduConnect</h1>
+                    <h1 style={styles.logo}>PINSUS</h1>
                 </div>
 
                 <div style={styles.navButtons}>
@@ -472,6 +508,36 @@ export default function EditProfile({ onBack, onLogout }) {
                     )}
                 </section>
 
+                <section style={styles.existingProfilesSection}>
+                    <h3 style={styles.sectionTitle}>Moje recenzije</h3>
+
+                    {loadingReviews ? (
+                        <div style={styles.messageBox}>Učitavanje recenzija...</div>
+                    ) : reviews.length === 0 ? (
+                        <div style={styles.messageBox}>Još nemaš recenzija.</div>
+                    ) : (
+                        <div style={styles.profilesGrid}>
+                            {reviews.map((review, index) => (
+                                <article key={`${getReviewReviewer(review)}-${index}`} style={styles.profileCard}>
+                                    <div style={styles.reviewHeader}>
+                                        <h4 style={styles.profileSubject}>
+                                            ⭐ {getReviewScore(review)}
+                                        </h4>
+
+                                        <span style={styles.reviewerName}>
+                                            {getReviewReviewer(review) || "Korisnik"}
+                                        </span>
+                                    </div>
+
+                                    <p style={styles.profileDescription}>
+                                        {getReviewComment(review) || "Nema komentara."}
+                                    </p>
+                                </article>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
                 {editingProfile && (
                     <section style={styles.editPanel}>
                         <form style={styles.card} onSubmit={updateProfile}>
@@ -587,6 +653,18 @@ function getInstructorName(instructor) {
 
 function getProfileSubject(profile) {
     return profile.subject || profile.subjectName || profile.subject?.name || "";
+}
+
+function getReviewReviewer(review) {
+    return review.reviewer || review.reviewerName || review.user || "";
+}
+
+function getReviewScore(review) {
+    return review.score || review.rating || "";
+}
+
+function getReviewComment(review) {
+    return review.comment || review.reviewComment || "";
 }
 
 const styles = {
@@ -796,6 +874,19 @@ const styles = {
         display: "flex",
         gap: "10px",
         marginTop: "16px",
+    },
+
+    reviewHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "12px",
+    },
+
+    reviewerName: {
+        color: "#64748b",
+        fontWeight: "bold",
     },
 
     editButton: {

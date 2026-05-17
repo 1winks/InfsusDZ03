@@ -32,6 +32,7 @@ export default function Pocetna({ onLogin }) {
                 alert("Login uspješan!");
                 localStorage.setItem("token", data.accessToken || data.token);
                 localStorage.setItem("username", data.username);
+                localStorage.setItem("roles", JSON.stringify(data.roles));
                 console.log("LOGIN DATA:", data);
                 console.log("SAVED TOKEN:", localStorage.getItem("token"));
 
@@ -83,7 +84,7 @@ export default function Pocetna({ onLogin }) {
             <nav style={styles.navbar}>
                 <div style={styles.logoSection}>
                     <button type="button" style={styles.menuButton}>☰</button>
-                    <h1 style={styles.logo}>EduConnect</h1>
+                    <h1 style={styles.logo}>PINSUS</h1>
                 </div>
             </nav>
 
@@ -92,7 +93,7 @@ export default function Pocetna({ onLogin }) {
                     <div style={styles.heroContent}>
                         <h2 style={styles.heroTitle}>Pronađi najboljeg instruktora online</h2>
                         <p style={styles.heroText}>
-                            EduConnect povezuje učenike i instruktore za matematiku,
+                            PINSUS povezuje učenike i instruktore za matematiku,
                             programiranje, jezike i druge predmete. Uči brzo, jednostavno i
                             kvalitetno.
                         </p>
@@ -113,7 +114,7 @@ export default function Pocetna({ onLogin }) {
                     </div>
 
                     <section style={styles.card}>
-                        <h3 style={styles.cardTitle}>EduConnect</h3>
+                        <h3 style={styles.cardTitle}>PINSUS</h3>
                         <p style={styles.cardSubtitle}>Sustav za pronalaženje instruktora</p>
 
                         <div style={styles.tabs}>
@@ -160,7 +161,7 @@ export default function Pocetna({ onLogin }) {
                                     Prijavi se
                                 </button>
 
-                                <p style={styles.smallText}>Zaboravljena lozinka?</p>
+
                             </form>
                         ) : (
                             <form onSubmit={handleRegister} style={styles.form}>
