@@ -48,4 +48,12 @@ public class Instructor {
     @JsonIgnore
     @OneToMany(mappedBy = "reviewed")
     private List<Review> receivedReviews = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "teacher")
+    private List<Lesson> taughtLessons = new ArrayList<>();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "student")
+    private List<Lesson> attendedLessons = new ArrayList<>();
 }
