@@ -1,47 +1,126 @@
 import { useEffect, useState } from "react";
+import EditProfile from "./EditProfile";
+import OstaviRecenziju from "./OstaviRecenziju";
 
 export default function PregledInstruktora({ onLogout }) {
     const [instructors, setInstructors] = useState([]);
-    const [profiles, setProfiles] = useState([]);
+    const [profileCards, setProfileCards] = useState([]);
     const [selectedInstructor, setSelectedInstructor] = useState(null);
+    const [selectedInstructorProfiles, setSelectedInstructorProfiles] = useState([]);
+    const [selectedInstructorReviews, setSelectedInstructorReviews] = useState([]);
+    const [reviewInstructor, setReviewInstructor] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profileLoading, setProfileLoading] = useState(false);
     const [search, setSearch] = useState("");
+    const [sortBy, setSortBy] = useState("subject");
+    const [selectedSubject, setSelectedSubject] = useState("");
+    const [showEditProfile, setShowEditProfile] = useState(false);
 
     useEffect(() => {
-        fetchInstructors();
+        fetchInstructorsAndProfiles();
     }, []);
-
-    const getToken = () => localStorage.getItem("token");
 
     const authHeaders = () => ({
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
     });
 
-    const fetchInstructors = async () => {
+    const logout = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("username");
+
+        if (onLogout) {
+            onLogout();
+        }
+    };
+
+    const handleUnauthorized = () => {
+        alert("Sesija je istekla. Prijavi se ponovno.");
+        logout();
+    };
+
+    const fetchInstructorsAndProfiles = async () => {
         try {
             setLoading(true);
 
-            const response = await fetch("http://localhost:8080/api/resources/instructors", {
-                method: "GET",
-                headers: authHeaders(),
-            });
+            const instructorsResponse = await fetch(
+                "http://localhost:8080/api/resources/instructors",
+                {
+                    method: "GET",
+                    headers: authHeaders(),
+                }
+            );
 
-            if (response.status === 401 || response.status === 403) {
-                alert("Sesija je istekla. Prijavi se ponovno.");
-                logout();
+            if (instructorsResponse.status === 401 || instructorsResponse.status === 403) {
+                handleUnauthorized();
                 return;
             }
 
-            const data = await response.json();
+            const instructorsData = await instructorsResponse.json();
 
-            if (response.ok) {
-                setInstructors(data);
-            } else {
-                console.error(data);
+            if (!instructorsResponse.ok) {
+                console.error(instructorsData);
                 alert("Greška kod dohvaćanja instruktora.");
+                return;
             }
+
+            setInstructors(instructorsData);
+
+            const allProfiles = await Promise.all(
+                instructorsData.map(async (instructor) => {
+                    const instructorName = getInstructorUsername(instructor);
+
+                    if (!instructorName) {
+                        return [];
+                    }
+
+                    const profileResponse = await fetch(
+                        `http://localhost:8080/api/resources/profiles/${instructorName}`,
+                        {
+                            method: "GET",
+                            headers: authHeaders(),
+                        }
+                    );
+
+                    if (profileResponse.status === 401 || profileResponse.status === 403) {
+                        handleUnauthorized();
+                        return [];
+                    }
+
+                    if (!profileResponse.ok) {
+                        return [];
+                    }
+
+                    const profiles = await profileResponse.json();
+
+                    let reviews = [];
+
+                    try {
+                        const reviewsResponse = await fetch(
+                            `http://localhost:8080/api/resources/reviews/${instructorName}`,
+                            {
+                                method: "GET",
+                                headers: authHeaders(),
+                            }
+                        );
+
+                        if (reviewsResponse.ok) {
+                            reviews = await reviewsResponse.json();
+                        }
+                    } catch (error) {
+                        console.error("Greška kod dohvaćanja recenzija:", error);
+                    }
+
+                    return profiles.map((profile, index) => ({
+                        id: `${instructorName}-${getProfileSubject(profile)}-${index}`,
+                        instructor,
+                        profile,
+                        reviews,
+                    }));
+                })
+            );
+
+            setProfileCards(allProfiles.flat());
         } catch (error) {
             console.error(error);
             alert("Backend nije dostupan.");
@@ -61,29 +140,45 @@ export default function PregledInstruktora({ onLogout }) {
         try {
             setProfileLoading(true);
             setSelectedInstructor(instructor);
-            setProfiles([]);
+            setSelectedInstructorProfiles([]);
+            setSelectedInstructorReviews([]);
 
-            const response = await fetch(
-                `http://localhost:8080/api/resources/profiles/${username}`,
-                {
+            const [profilesResponse, reviewsResponse] = await Promise.all([
+                fetch(`http://localhost:8080/api/resources/profiles/${username}`, {
                     method: "GET",
                     headers: authHeaders(),
-                }
-            );
+                }),
+                fetch(`http://localhost:8080/api/resources/reviews/${username}`, {
+                    method: "GET",
+                    headers: authHeaders(),
+                }),
+            ]);
 
-            if (response.status === 401 || response.status === 403) {
-                alert("Sesija je istekla. Prijavi se ponovno.");
-                logout();
+            if (
+                profilesResponse.status === 401 ||
+                profilesResponse.status === 403 ||
+                reviewsResponse.status === 401 ||
+                reviewsResponse.status === 403
+            ) {
+                handleUnauthorized();
                 return;
             }
 
-            const data = await response.json();
+            const profilesData = await profilesResponse.json();
+            const reviewsData = await reviewsResponse.json();
 
-            if (response.ok) {
-                setProfiles(data);
+            if (profilesResponse.ok) {
+                setSelectedInstructorProfiles(profilesData);
             } else {
-                console.error(data);
+                console.error(profilesData);
                 alert("Greška kod dohvaćanja profila instruktora.");
+            }
+
+            if (reviewsResponse.ok) {
+                setSelectedInstructorReviews(reviewsData);
+            } else {
+                console.error(reviewsData);
+                alert("Greška kod dohvaćanja recenzija instruktora.");
             }
         } catch (error) {
             console.error(error);
@@ -93,67 +188,165 @@ export default function PregledInstruktora({ onLogout }) {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("username");
+    const filteredAndSortedProfiles = profileCards
+        .filter(({ instructor, profile }) => {
+            if (selectedSubject && getProfileSubject(profile) !== selectedSubject) {
+                return false;
+            }
 
-        if (onLogout) {
-            onLogout();
-        }
-    };
+            const instructorName = getInstructorUsername(instructor).toLowerCase();
+            const email = getInstructorEmail(instructor).toLowerCase();
+            const phone = getInstructorPhone(instructor).toLowerCase();
+            const subject = getProfileSubject(profile).toLowerCase();
+            const description = getProfileDescription(profile).toLowerCase();
+            const query = search.toLowerCase();
 
-    const filteredInstructors = instructors.filter((instructor) => {
-        const username = getInstructorUsername(instructor).toLowerCase();
-        const email = getInstructorEmail(instructor).toLowerCase();
-        const phone = getInstructorPhone(instructor).toLowerCase();
+            return (
+                instructorName.includes(query) ||
+                email.includes(query) ||
+                phone.includes(query) ||
+                subject.includes(query) ||
+                description.includes(query)
+            );
+        })
+        .sort((a, b) => {
+            const subjectA = getProfileSubject(a.profile).toLowerCase();
+            const subjectB = getProfileSubject(b.profile).toLowerCase();
+            const priceA = Number(getProfilePrice(a.profile)) || 0;
+            const priceB = Number(getProfilePrice(b.profile)) || 0;
+            const ratingA = getAverageScoreNumber(a.reviews);
+            const ratingB = getAverageScoreNumber(b.reviews);
 
+            if (sortBy === "subject") {
+                return subjectA.localeCompare(subjectB);
+            }
+
+            if (sortBy === "price-asc") {
+                return priceA - priceB;
+            }
+
+            if (sortBy === "price-desc") {
+                return priceB - priceA;
+            }
+
+            if (sortBy === "rating-desc") {
+                return ratingB - ratingA;
+            }
+
+            if (sortBy === "rating-asc") {
+                return ratingA - ratingB;
+            }
+
+            return 0;
+        });
+
+    if (showEditProfile) {
         return (
-            username.includes(search.toLowerCase()) ||
-            email.includes(search.toLowerCase()) ||
-            phone.includes(search.toLowerCase())
-        );
-    });
-
-    if (selectedInstructor) {
-        return (
-            <InstructorProfile
-                instructor={selectedInstructor}
-                profiles={profiles}
-                loading={profileLoading}
+            <EditProfile
                 onBack={() => {
-                    setSelectedInstructor(null);
-                    setProfiles([]);
+                    setShowEditProfile(false);
+                    fetchInstructorsAndProfiles();
                 }}
                 onLogout={logout}
             />
         );
     }
 
+    if (reviewInstructor) {
+        return (
+            <OstaviRecenziju
+                instructor={reviewInstructor}
+                onBack={() => {
+                    setReviewInstructor(null);
+                    if (selectedInstructor) {
+                        fetchProfilesForInstructor(selectedInstructor);
+                    }
+                }}
+                onLogout={logout}
+            />
+        );
+    }
+
+    if (selectedInstructor) {
+        return (
+            <InstructorProfile
+                instructor={selectedInstructor}
+                profiles={selectedInstructorProfiles}
+                reviews={selectedInstructorReviews}
+                loading={profileLoading}
+                onBack={() => {
+                    setSelectedInstructor(null);
+                    setSelectedInstructorProfiles([]);
+                    setSelectedInstructorReviews([]);
+                }}
+                onLogout={logout}
+                onReview={() => setReviewInstructor(selectedInstructor)}
+            />
+        );
+    }
+
     return (
         <div style={styles.page}>
-            <Navbar onLogout={logout} />
+            <Navbar
+                onLogout={logout}
+                onEditProfile={() => setShowEditProfile(true)}
+            />
 
             <main style={styles.container}>
-                <h2 style={styles.title}>Pregled instruktora</h2>
+                <h2 style={styles.title}>Pregled profila instrukcija</h2>
 
-                <input
-                    type="text"
-                    placeholder="Pretraži instruktore"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={styles.searchInput}
-                />
+                <section style={styles.controls}>
+                    <input
+                        type="text"
+                        placeholder="Pretraži po instruktoru, predmetu, telefonu ili opisu"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={styles.searchInput}
+                    />
+
+                    <div style={styles.sortControls}>
+                        <select
+                            value={selectedSubject}
+                            onChange={(e) => setSelectedSubject(e.target.value)}
+                            style={styles.sortSelect}
+                        >
+                            <option value="">Svi predmeti</option>
+
+                            {[...new Set(profileCards.map(({ profile }) => getProfileSubject(profile)))].map(
+                                (subject, index) => (
+                                    <option key={`${subject}-${index}`} value={subject}>
+                                        {subject}
+                                    </option>
+                                )
+                            )}
+                        </select>
+
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            style={styles.sortSelect}
+                        >
+                            <option value="subject">Sortiraj po predmetu</option>
+                            <option value="price-asc">Cijena: najniža prvo</option>
+                            <option value="price-desc">Cijena: najviša prvo</option>
+                            <option value="rating-desc">Ocjena: najviša prvo</option>
+                            <option value="rating-asc">Ocjena: najniža prvo</option>
+                        </select>
+                    </div>
+                </section>
 
                 {loading ? (
-                    <div style={styles.messageBox}>Učitavanje instruktora...</div>
-                ) : filteredInstructors.length === 0 ? (
-                    <div style={styles.messageBox}>Nema instruktora za prikaz.</div>
+                    <div style={styles.messageBox}>Učitavanje profila instrukcija...</div>
+                ) : filteredAndSortedProfiles.length === 0 ? (
+                    <div style={styles.messageBox}>Nema profila instrukcija za prikaz.</div>
                 ) : (
                     <div style={styles.cardsContainer}>
-                        {filteredInstructors.map((instructor, index) => (
-                            <InstructorCard
-                                key={getInstructorId(instructor) || index}
+                        {filteredAndSortedProfiles.map(({ id, instructor, profile, reviews }) => (
+                            <InstructionProfileCard
+                                key={id}
                                 instructor={instructor}
+                                profile={profile}
+                                reviews={reviews}
                                 onOpenProfile={() => fetchProfilesForInstructor(instructor)}
                             />
                         ))}
@@ -164,7 +357,7 @@ export default function PregledInstruktora({ onLogout }) {
     );
 }
 
-function Navbar({ onLogout }) {
+function Navbar({ onLogout, onEditProfile }) {
     return (
         <nav style={styles.navbar}>
             <div style={styles.logoSection}>
@@ -173,10 +366,7 @@ function Navbar({ onLogout }) {
             </div>
 
             <div style={styles.navButtons}>
-                <button
-                    style={styles.profileButton}
-                    onClick={() => alert("Ovdje ćemo spojiti stranicu za uređivanje profila.")}
-                >
+                <button style={styles.profileButton} onClick={onEditProfile}>
                     Uredi profil
                 </button>
 
@@ -188,17 +378,33 @@ function Navbar({ onLogout }) {
     );
 }
 
-function InstructorCard({ instructor, onOpenProfile }) {
+function InstructionProfileCard({ instructor, profile, reviews, onOpenProfile }) {
     const username = getInstructorUsername(instructor);
     const email = getInstructorEmail(instructor);
     const phone = getInstructorPhone(instructor);
     const age = getInstructorAge(instructor);
+    const subject = getProfileSubject(profile);
+    const price = getProfilePrice(profile);
+    const description = getProfileDescription(profile);
+    const averageScore = calculateAverageScore(reviews);
 
     return (
         <article style={styles.card}>
-            <div style={styles.avatar}>{username ? username.charAt(0).toUpperCase() : "I"}</div>
+            <div style={styles.cardHeader}>
+                <div style={styles.avatar}>{username ? username.charAt(0).toUpperCase() : "I"}</div>
 
-            <h3 style={styles.cardTitle}>{username || "Instruktor"}</h3>
+                <div>
+                    <h3 style={styles.cardTitle}>{username || "Instruktor"}</h3>
+                    <p style={styles.subject}>{subject || "Predmet nije unesen"}</p>
+                </div>
+            </div>
+
+            <div style={styles.cardStats}>
+                <div style={styles.priceBox}>{price ? `${price} €/h` : "Cijena nije unesena"}</div>
+                <div style={styles.ratingBox}>⭐ {averageScore}</div>
+            </div>
+
+            <p style={styles.description}>{description || "Nema opisa profila instrukcija."}</p>
 
             <div style={styles.infoSection}>
                 {email && <p>📧 {email}</p>}
@@ -207,17 +413,18 @@ function InstructorCard({ instructor, onOpenProfile }) {
             </div>
 
             <button style={styles.profileViewButton} onClick={onOpenProfile}>
-                Pogledaj profil
+                Pogledaj profil instruktora
             </button>
         </article>
     );
 }
 
-function InstructorProfile({ instructor, profiles, loading, onBack, onLogout }) {
+function InstructorProfile({ instructor, profiles, reviews, loading, onBack, onLogout, onReview }) {
     const username = getInstructorUsername(instructor);
     const email = getInstructorEmail(instructor);
     const phone = getInstructorPhone(instructor);
     const age = getInstructorAge(instructor);
+    const averageScore = calculateAverageScore(reviews);
 
     return (
         <div style={styles.page}>
@@ -244,18 +451,25 @@ function InstructorProfile({ instructor, profiles, loading, onBack, onLogout }) 
 
                     <div>
                         <h2 style={styles.profileName}>{username || "Instruktor"}</h2>
-                        <p style={styles.profileSubject}>Profil instruktora</p>
+                        <p style={styles.profileSubject}>Podaci o instruktoru</p>
 
                         <div style={styles.profileMeta}>
                             {email && <p>📧 {email}</p>}
                             {phone && <p>📞 {phone}</p>}
                             {age && <p>🎂 {age} godina</p>}
+                            <p>⭐ Prosječna ocjena: {averageScore}</p>
                         </div>
                     </div>
                 </section>
 
                 <section style={styles.profileCard}>
-                    <h3 style={styles.sectionTitle}>Predmeti i cijene</h3>
+                    <div style={styles.profileHeaderActions}>
+                        <h3 style={styles.sectionTitle}>Profili instrukcija</h3>
+
+                        <button style={styles.reviewButton} onClick={onReview}>
+                            Ostavi recenziju
+                        </button>
+                    </div>
 
                     {loading ? (
                         <p style={styles.emptyText}>Učitavanje profila...</p>
@@ -264,7 +478,23 @@ function InstructorProfile({ instructor, profiles, loading, onBack, onLogout }) 
                     ) : (
                         <div style={styles.profileGrid}>
                             {profiles.map((profile, index) => (
-                                <ProfileItem key={profile.id || index} profile={profile} />
+                                <ProfileItem key={`${getProfileSubject(profile)}-${index}`} profile={profile} />
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                <section style={styles.profileCard}>
+                    <h3 style={styles.sectionTitle}>Recenzije</h3>
+
+                    {loading ? (
+                        <p style={styles.emptyText}>Učitavanje recenzija...</p>
+                    ) : reviews.length === 0 ? (
+                        <p style={styles.emptyText}>Ovaj instruktor još nema recenzija.</p>
+                    ) : (
+                        <div style={styles.reviewsGrid}>
+                            {reviews.map((review, index) => (
+                                <ReviewItem key={`${getReviewReviewer(review)}-${index}`} review={review} />
                             ))}
                         </div>
                     )}
@@ -292,8 +522,37 @@ function ProfileItem({ profile }) {
     );
 }
 
-function getInstructorId(instructor) {
-    return instructor.id || instructor.instructorId || instructor.userId || "";
+function ReviewItem({ review }) {
+    return (
+        <div style={styles.reviewCard}>
+            <div style={styles.reviewHeader}>
+                <strong>{getReviewReviewer(review) || "Korisnik"}</strong>
+                <span>⭐ {getReviewScore(review)}</span>
+            </div>
+
+            <p style={styles.reviewComment}>{getReviewComment(review)}</p>
+        </div>
+    );
+}
+
+function calculateAverageScore(reviews) {
+    if (!reviews || reviews.length === 0) {
+        return "Nema ocjena";
+    }
+
+    return getAverageScoreNumber(reviews).toFixed(2);
+}
+
+function getAverageScoreNumber(reviews) {
+    if (!reviews || reviews.length === 0) {
+        return 0;
+    }
+
+    const total = reviews.reduce((sum, review) => {
+        return sum + (Number(getReviewScore(review)) || 0);
+    }, 0);
+
+    return total / reviews.length;
 }
 
 function getInstructorUsername(instructor) {
@@ -328,6 +587,18 @@ function getProfilePrice(profile) {
 
 function getProfileDescription(profile) {
     return profile.description || "";
+}
+
+function getReviewReviewer(review) {
+    return review.reviewer || review.reviewerName || review.user || "";
+}
+
+function getReviewScore(review) {
+    return review.score || review.rating || "";
+}
+
+function getReviewComment(review) {
+    return review.comment || review.reviewComment || "";
 }
 
 const styles = {
@@ -406,20 +677,41 @@ const styles = {
         textAlign: "center",
     },
 
+    controls: {
+        display: "grid",
+        gridTemplateColumns: "1fr 520px",
+        gap: "16px",
+        marginBottom: "30px",
+    },
+
     searchInput: {
         width: "100%",
         padding: "16px",
         borderRadius: "12px",
         border: "1px solid #cbd5e1",
-        marginBottom: "30px",
         fontSize: "16px",
+        boxSizing: "border-box",
+    },
+
+    sortControls: {
+        display: "flex",
+        gap: "12px",
+    },
+
+    sortSelect: {
+        width: "100%",
+        padding: "16px",
+        borderRadius: "12px",
+        border: "1px solid #cbd5e1",
+        fontSize: "16px",
+        backgroundColor: "white",
         boxSizing: "border-box",
     },
 
     cardsContainer: {
         width: "100%",
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
         gap: "24px",
     },
 
@@ -428,6 +720,13 @@ const styles = {
         borderRadius: "20px",
         padding: "24px",
         boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+    },
+
+    cardHeader: {
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        marginBottom: "18px",
     },
 
     avatar: {
@@ -441,12 +740,53 @@ const styles = {
         justifyContent: "center",
         fontSize: "24px",
         fontWeight: "bold",
-        marginBottom: "16px",
+        flexShrink: 0,
     },
 
     cardTitle: {
-        margin: "0 0 8px 0",
+        margin: "0 0 6px 0",
         fontSize: "26px",
+    },
+
+    subject: {
+        margin: 0,
+        color: "#2563eb",
+        fontWeight: "bold",
+        fontSize: "18px",
+    },
+
+    cardStats: {
+        display: "flex",
+        gap: "10px",
+        flexWrap: "wrap",
+        marginBottom: "16px",
+    },
+
+    priceBox: {
+        backgroundColor: "#dbeafe",
+        color: "#1d4ed8",
+        fontWeight: "bold",
+        fontSize: "22px",
+        padding: "12px 16px",
+        borderRadius: "14px",
+        marginBottom: "16px",
+        display: "inline-block",
+    },
+
+    ratingBox: {
+        backgroundColor: "#fef3c7",
+        color: "#92400e",
+        fontWeight: "bold",
+        fontSize: "22px",
+        padding: "12px 16px",
+        borderRadius: "14px",
+        display: "inline-block",
+    },
+
+    description: {
+        color: "#475569",
+        lineHeight: "1.6",
+        minHeight: "52px",
     },
 
     infoSection: {
@@ -533,6 +873,25 @@ const styles = {
         marginBottom: "24px",
     },
 
+    profileHeaderActions: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "16px",
+        marginBottom: "18px",
+    },
+
+    reviewButton: {
+        backgroundColor: "#0f172a",
+        color: "white",
+        border: "none",
+        padding: "14px 20px",
+        borderRadius: "12px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        fontSize: "15px",
+    },
+
     sectionTitle: {
         margin: "0 0 18px 0",
         fontSize: "28px",
@@ -573,5 +932,31 @@ const styles = {
     emptyText: {
         color: "#64748b",
         margin: 0,
+    },
+
+    reviewsGrid: {
+        display: "grid",
+        gap: "16px",
+    },
+
+    reviewCard: {
+        backgroundColor: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: "18px",
+        padding: "18px",
+    },
+
+    reviewHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "10px",
+        color: "#0f172a",
+    },
+
+    reviewComment: {
+        margin: 0,
+        color: "#475569",
+        lineHeight: "1.6",
     },
 };
