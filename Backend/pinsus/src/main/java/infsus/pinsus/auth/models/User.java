@@ -34,6 +34,9 @@ public class User {
     @Size(max = 120)
     private String password;
 
+    @Column(nullable = false)
+    private Boolean blocked = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
@@ -95,10 +98,18 @@ public class User {
         return instructor;
     }
 
-    public void setReader(Instructor instructor) {
+    public void setInstructor(Instructor instructor) {
         this.instructor = instructor;
         if (instructor != null) {
             instructor.setUser(this);
         }
+    }
+
+    public Boolean getBlocked() {
+        return blocked;
+    }
+
+    public void setBlocked(Boolean blocked) {
+        this.blocked = blocked;
     }
 }

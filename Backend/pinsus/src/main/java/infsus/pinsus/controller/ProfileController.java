@@ -3,6 +3,7 @@ package infsus.pinsus.controller;
 import infsus.pinsus.domain.Profile;
 import infsus.pinsus.dto.ProfileDTO;
 import infsus.pinsus.dto.ProfileDTO2;
+import infsus.pinsus.dto.ProfileDTO3;
 import infsus.pinsus.service.ProfileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,5 +28,17 @@ public class ProfileController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public Profile createProfile(@RequestBody ProfileDTO2 profileDTO2) {
         return profileService.createProfile(profileDTO2);
+    }
+
+    @PutMapping ("/update")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public Profile updateProfile(@RequestBody ProfileDTO2 profileDTO2) {
+        return profileService.updateProfile(profileDTO2);
+    }
+
+    @DeleteMapping("/delete")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public void deleteProfile(@RequestBody ProfileDTO3 profileDTO3) {
+        profileService.deleteProfile(profileDTO3);
     }
 }

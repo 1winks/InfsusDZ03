@@ -3,6 +3,7 @@ package infsus.pinsus.service.impl;
 import infsus.pinsus.auth.models.User;
 import infsus.pinsus.auth.repository.UserRepository;
 import infsus.pinsus.domain.Instructor;
+import infsus.pinsus.domain.Profile;
 import infsus.pinsus.dto.InstructorDTO;
 import infsus.pinsus.dto.InstructorDTO2;
 import infsus.pinsus.dto.SubjectDTO;
@@ -37,7 +38,14 @@ public class InstructorServiceImpl implements InstructorService {
             instructorDTO.setEmail(instructor.getUser().getEmail());
             instructorDTO.setAge(instructor.getAge());
             instructorDTO.setPhone(instructor.getPhone());
+
+            List<Profile> profiles = instructor.getProfiles();
             List<SubjectDTO> subjects = new ArrayList<>();
+            for (Profile profile : profiles) {
+                String subjectName = profile.getSubject().getName();
+                SubjectDTO subjectDTO = new SubjectDTO(subjectName);
+                subjects.add(subjectDTO);
+            }
             instructorDTO.setSubjects(subjects);
 
             instructorDTOS.add(instructorDTO);

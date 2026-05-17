@@ -7,6 +7,7 @@ import infsus.pinsus.domain.Profile;
 import infsus.pinsus.domain.Subject;
 import infsus.pinsus.dto.ProfileDTO;
 import infsus.pinsus.dto.ProfileDTO2;
+import infsus.pinsus.dto.ProfileDTO3;
 import infsus.pinsus.repository.InstructorRepository;
 import infsus.pinsus.repository.ProfileRepository;
 import infsus.pinsus.repository.SubjectRepository;
@@ -53,16 +54,47 @@ public class ProfileServiceImpl implements ProfileService {
 
         Optional<User> user = userRepository.findByUsername(profileDTO2.getName());
         Instructor instructor = user.get().getInstructor();
+        Long instructorId = instructor.getId();
+        Subject subject = subjectRepository.findByName(profileDTO2.getSubject());
+        if (profileRepository.existsByInstructorIdAndSubject(instructorId, subject)) {
+            throw new RuntimeException(
+                    "Profile for this subject already exists"
+            );
+        }
+
         profile.setInstructor(instructor);
         List<Profile> profiles = instructor.getProfiles();
         profiles.add(profile);
         instructorRepository.save(instructor);
 
-        Subject subject = subjectRepository.findByName(profileDTO2.getSubject());
         profile.setSubject(subject);
         List<Profile> profiles2 = subject.getProfiles();
         profiles2.add(profile);
         subjectRepository.save(subject);
         return profileRepository.save(profile);
+    }
+
+    @Override
+    public Profile updateProfile(ProfileDTO2 profileDTO2) {
+        Optional<User> user = userRepository.findByUsername(profileDTO2.getName());
+        Instructor instructor = user.get().getInstructor();
+        Long instructorId = instructor.getId();
+        Subject subject = subjectRepository.findByName(profileDTO2.getSubject());
+        Profile profile = profileRepository.findByInstructorIdAndSubject(instructorId, subject);
+
+        profile.setDescription(profileDTO2.getDescription());
+        profile.setPrice(profileDTO2.getPrice());
+        return profileRepository.save(profile);
+    }
+
+    @Override
+    public void deleteProfile(ProfileDTO3 profileDTO3) {
+        Optional<User> user = userRepository.findByUsername(profileDTO3.getName());
+        Instructor instructor = user.get().getInstructor();
+        Long instructorId = instructor.getId();
+        Subject subject = subjectRepository.findByName(profileDTO3.getSubject());
+        Profile profile = profileRepository.findByInstructorIdAndSubject(instructorId, subject);
+
+        profileRepository.delete(profile);
     }
 }

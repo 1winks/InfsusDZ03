@@ -2,6 +2,7 @@ package infsus.pinsus.auth.controllers;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -21,6 +22,7 @@ import infsus.pinsus.repository.InstructorRepository;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -57,6 +59,13 @@ public class AuthController {
 
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+        User user = userRepository.findByUsername(loginRequest.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getBlocked()) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body("User is blocked");
+        }
 
         Authentication authentication = authenticationManager
                 .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
@@ -115,7 +124,7 @@ public class AuthController {
         user.setRoles(roles);
         if (roles.contains(userRoleCheck)) {
             Instructor instructor = new Instructor();
-            user.setReader(instructor);
+            user.setInstructor(instructor);
             userRepository.save(user);
             instructorRepository.save(instructor);
         } else {

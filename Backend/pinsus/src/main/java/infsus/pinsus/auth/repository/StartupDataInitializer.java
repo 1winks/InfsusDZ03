@@ -77,7 +77,7 @@ public class StartupDataInitializer {
 
     private void assignInstructor(User user) {
         Instructor instructor = new Instructor();
-        user.setReader(instructor);
+        user.setInstructor(instructor);
         userRepository.save(user);
         instructorRepository.save(instructor);
     }
