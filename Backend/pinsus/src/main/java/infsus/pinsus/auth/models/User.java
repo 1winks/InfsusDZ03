@@ -3,6 +3,8 @@ package infsus.pinsus.auth.models;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import infsus.pinsus.domain.Instructor;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +37,10 @@ public class User {
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    @JsonBackReference
+    private Instructor instructor;
 
     public User() {
     }
@@ -83,5 +89,16 @@ public class User {
 
     public void setRoles(Set<Role> roles) {
         this.roles = roles;
+    }
+
+    public Instructor getInstructor() {
+        return instructor;
+    }
+
+    public void setReader(Instructor instructor) {
+        this.instructor = instructor;
+        if (instructor != null) {
+            instructor.setUser(this);
+        }
     }
 }

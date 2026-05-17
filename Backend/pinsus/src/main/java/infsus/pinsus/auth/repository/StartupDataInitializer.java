@@ -3,7 +3,9 @@ package infsus.pinsus.auth.repository;
 import infsus.pinsus.auth.models.ERole;
 import infsus.pinsus.auth.models.Role;
 import infsus.pinsus.auth.models.User;
+import infsus.pinsus.domain.Instructor;
 import infsus.pinsus.domain.Subject;
+import infsus.pinsus.repository.InstructorRepository;
 import infsus.pinsus.repository.SubjectRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -30,6 +32,9 @@ public class StartupDataInitializer {
     @Autowired
     private SubjectRepository subjectRepository;
 
+    @Autowired
+    private InstructorRepository instructorRepository;
+
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         if (roleRepository.count() == 0) {
@@ -51,7 +56,7 @@ public class StartupDataInitializer {
             userUser.setRoles(new HashSet<>(Set.of(userRole)));
             userRepository.save(adminUser);
             userRepository.save(modUser);
-            userRepository.save(userUser);
+            assignInstructor(userUser);
 
             List<String> predmeti = List.of(
                     "Hrvatski", "Matematika", "Engleski", "Njemački", "Francuski",
@@ -68,6 +73,13 @@ public class StartupDataInitializer {
                 subjectRepository.save(subject);
             }
         }
+    }
+
+    private void assignInstructor(User user) {
+        Instructor instructor = new Instructor();
+        user.setReader(instructor);
+        userRepository.save(user);
+        instructorRepository.save(instructor);
     }
 
 }

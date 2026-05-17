@@ -16,6 +16,8 @@ import infsus.pinsus.auth.repository.RoleRepository;
 import infsus.pinsus.auth.repository.UserRepository;
 import infsus.pinsus.auth.security.jwt.JwtUtils;
 import infsus.pinsus.auth.security.services.UserDetailsImpl;
+import infsus.pinsus.domain.Instructor;
+import infsus.pinsus.repository.InstructorRepository;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,9 @@ public class AuthController {
 
     @Autowired
     RoleRepository roleRepository;
+
+    @Autowired
+    InstructorRepository instructorRepository;
 
     @Autowired
     PasswordEncoder encoder;
@@ -76,12 +81,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Email is already in use!"));
         }
 
-        // Create new user's account
         User user = new User(signUpRequest.getUsername(), signUpRequest.getEmail(),
                 encoder.encode(signUpRequest.getPassword()));
         Set<String> strRoles = signUpRequest.getRole();
         Set<Role> roles = new HashSet<>();
 
+        Role userRoleCheck = roleRepository.findByName(ERole.ROLE_USER)
+                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
         if (strRoles == null) {
             Role userRole = roleRepository.findByName(ERole.ROLE_USER)
                     .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
@@ -107,7 +113,14 @@ public class AuthController {
             });
         }
         user.setRoles(roles);
-        userRepository.save(user);
+        if (roles.contains(userRoleCheck)) {
+            Instructor instructor = new Instructor();
+            user.setReader(instructor);
+            userRepository.save(user);
+            instructorRepository.save(instructor);
+        } else {
+            userRepository.save(user);
+        }
         return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
     }
 }
