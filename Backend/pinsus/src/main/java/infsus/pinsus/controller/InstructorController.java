@@ -6,6 +6,7 @@ import infsus.pinsus.domain.Instructor;
 import infsus.pinsus.dto.BlockDTO;
 import infsus.pinsus.dto.InstructorDTO;
 import infsus.pinsus.dto.InstructorDTO2;
+import infsus.pinsus.dto.InstructorDTO3;
 import infsus.pinsus.repository.InstructorRepository;
 import infsus.pinsus.service.InstructorService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,12 @@ public class InstructorController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public List<InstructorDTO> listInstructors(){
         return instructorService.listAllActive();
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<InstructorDTO3> listInstructorsAll(){
+        return instructorService.listAll();
     }
 
     @PutMapping("/update")

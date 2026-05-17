@@ -6,6 +6,7 @@ import infsus.pinsus.domain.Instructor;
 import infsus.pinsus.domain.Profile;
 import infsus.pinsus.dto.InstructorDTO;
 import infsus.pinsus.dto.InstructorDTO2;
+import infsus.pinsus.dto.InstructorDTO3;
 import infsus.pinsus.dto.SubjectDTO;
 import infsus.pinsus.repository.InstructorRepository;
 import infsus.pinsus.repository.SubjectRepository;
@@ -61,5 +62,20 @@ public class InstructorServiceImpl implements InstructorService {
         instructor.setPhone(instructorDTO.getPhone());
         instructor.setActive(instructorDTO.getActive());
         return instructorRepository.save(instructor);
+    }
+
+    @Override
+    public List<InstructorDTO3> listAll() {
+        List<InstructorDTO3> instructorDTO3s = new ArrayList<>();
+        List<Instructor> instructors = instructorRepository.findAll();
+        for (Instructor instructor : instructors) {
+            User user = instructor.getUser();
+            InstructorDTO3 instructorDTO3 = new InstructorDTO3();
+            instructorDTO3.setBlocked(user.getBlocked());
+            instructorDTO3.setName(user.getUsername());
+            instructorDTO3.setActive(instructor.getActive());
+            instructorDTO3s.add(instructorDTO3);
+        }
+        return instructorDTO3s;
     }
 }

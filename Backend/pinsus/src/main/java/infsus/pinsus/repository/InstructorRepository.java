@@ -1,6 +1,7 @@
 package infsus.pinsus.repository;
 
 import infsus.pinsus.domain.Instructor;
+import infsus.pinsus.dto.InstructorDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
