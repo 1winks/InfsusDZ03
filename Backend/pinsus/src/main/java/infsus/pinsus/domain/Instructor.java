@@ -1,5 +1,6 @@
 package infsus.pinsus.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import infsus.pinsus.auth.models.User;
 import jakarta.persistence.*;
@@ -7,6 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -32,4 +36,8 @@ public class Instructor {
     @JoinColumn(name = "user_id")
     @JsonManagedReference
     private User user;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "instructor")
+    private List<Profile> profiles = new ArrayList<>();
 }
